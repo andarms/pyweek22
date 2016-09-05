@@ -10,7 +10,7 @@ class Game:
 
     def __init__(self):
 
-        self.fps = 60
+        self.fps = 30
 
         self.screen = pg.display.get_surface()
         self.clock = pg.time.Clock()

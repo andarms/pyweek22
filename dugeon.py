@@ -21,8 +21,8 @@ def get_random_point_in_circle(w, h):
         r = u
     x = w*r*math.cos(t)
     y = h*r*math.sin(t)
-    x = math.floor(((x + TILE_SIZE - 1)/TILE_SIZE))*TILE_SIZE
-    y = math.floor(((y + TILE_SIZE - 1)/TILE_SIZE))*TILE_SIZE
+    x = math.floor(((x + TS2 - 1)/TS2))*TS2
+    y = math.floor(((y + TS2 - 1)/TS2))*TS2
     return [x, y]
 
 
@@ -33,7 +33,7 @@ class Wall(pg.sprite.DirtySprite):
     def __init__(self, pos,  *groups):
         super(Wall, self).__init__(*groups)
         self.pos = pos
-        self.image = pg.Surface((TILE_SIZE, TILE_SIZE))
+        self.image = pg.Surface((TS2, TS2))
         self.image.fill((255, 255, 0))
         self.rect = self.image.get_rect(topleft=self.pos)
         self.layer = 1
@@ -46,7 +46,7 @@ class Door(pg.sprite.DirtySprite):
     def __init__(self, pos,  *groups):
         super(Door, self).__init__(*groups)
         self.pos = pos
-        self.image = pg.Surface((TILE_SIZE, TILE_SIZE))
+        self.image = pg.Surface((TS2, TS2))
         self.image.fill((0, 0, 100))
         self.rect = self.image.get_rect(topleft=self.pos)
         self.layer = 1
@@ -78,10 +78,10 @@ class Cell(pg.sprite.DirtySprite):
         x, y = get_random_point_in_circle(40*TILE_SIZE, TILE_SIZE)
         self.pos[0] += x
         self.pos[1] += y
-        w = random.randint(2, MAX_ROOM_W)
-        h = random.randint(2, MAX_ROOM_H)
+        w = random.choice(range(TS2, TS2*MAX_ROOM_W, TS2))
+        h = random.choice(range(TS2, TS2*MAX_ROOM_H, TS2))
         self.color = [100, 100, 100]
-        self.image = pg.Surface((w*TILE_SIZE, h*TILE_SIZE))
+        self.image = pg.Surface((w, h))
         self.image.fill(self.color)
         self.rect = self.image.get_rect(topleft=self.pos)
         self.seleted = False
@@ -94,7 +94,7 @@ class Dugeon(object):
 
     def __init__(self):
         super(Dugeon, self).__init__()
-        self.cells_count = 80
+        self.cells_count = 150
         self.map_sprites = pg.sprite.LayeredDirty()
         self.rooms_group = pg.sprite.LayeredDirty()
         self.playerGroup = pg.sprite.LayeredDirty()
@@ -105,11 +105,11 @@ class Dugeon(object):
         while(len(self.cells) < self.cells_count):
             c = Cell()
             self.cells.append(c)
-        area, min_x, min_y = self.separate_cells(self.cells)
         self.rooms = self.select_main_rooms(self.cells)
+        area, min_x, min_y = self.separate_cells(self.rooms)
 
-        w = area[0] + MAX_ROOM_W*TILE_SIZE + TILE_SIZE*2
-        h = area[1] + MAX_ROOM_H*TILE_SIZE + TILE_SIZE*2
+        w = area[0] + MAX_ROOM_W*TS2 + TS2
+        h = area[1] + MAX_ROOM_H*TS2 + TS2
         self.image = pg.Surface((w, h))
         self.image.fill((0, 0, 0))
         self.rect = self.image.get_rect()
@@ -152,11 +152,11 @@ class Dugeon(object):
                     if a.rect.colliderect(b.rect):
                         touching = True
                         dx = min(
-                            a.rect.right-b.rect.left+TILE_SIZE,
-                            a.rect.left-b.rect.right-TILE_SIZE)
+                            a.rect.right-b.rect.left+TS2,
+                            a.rect.left-b.rect.right-TS2)
                         dy = min(
-                            a.rect.bottom-b.rect.top+TILE_SIZE,
-                            a.rect.top-b.rect.bottom-TILE_SIZE)
+                            a.rect.bottom-b.rect.top+TS2,
+                            a.rect.top-b.rect.bottom-TS2)
                         if (abs(dx) < abs(dy)):
                             dy = 0
                         else:
@@ -168,13 +168,13 @@ class Dugeon(object):
                         dyb = dy + dya
 
                         dxa = math.floor(
-                            ((dxa + TILE_SIZE - 1)/TILE_SIZE))*TILE_SIZE
+                            ((dxa + TS2 - 1)/TS2))*TS2
                         dxb = math.floor(
-                            ((dxb + TILE_SIZE - 1)/TILE_SIZE))*TILE_SIZE
+                            ((dxb + TS2 - 1)/TS2))*TS2
                         dya = math.floor(
-                            ((dya + TILE_SIZE - 1)/TILE_SIZE))*TILE_SIZE
+                            ((dya + TS2 - 1)/TS2))*TS2
                         dyb = math.floor(
-                            ((dyb + TILE_SIZE - 1)/TILE_SIZE))*TILE_SIZE
+                            ((dyb + TS2 - 1)/TS2))*TS2
 
                         a.pos[0] += dxa
                         a.pos[1] += dya
@@ -192,8 +192,8 @@ class Dugeon(object):
     def select_main_rooms(self, cells):
         seleted = []
         for room in cells:
-            if(room.rect.w > MIN_ROOM_W*TILE_SIZE
-                    and room.rect.h > MIN_ROOM_H*TILE_SIZE):
+            if(room.rect.w > MIN_ROOM_W*TS2
+                    and room.rect.h > MIN_ROOM_H*TS2):
                 room.seleted = True
                 seleted.append(room)
                 room.add(self.map_sprites, self.rooms_group)
@@ -238,17 +238,16 @@ class Dugeon(object):
             b = p1
         a = list(a)
         b = list(b)
-        w = h = TILE_SIZE
-        s2 = TILE_SIZE/2
+        w = h = TS2
         # magic o make the perfect centered hallways
-        a[0] -= s2
-        a[1] -= s2
-        b[0] -= s2
-        b[1] -= s2
-        a[0] = math.floor(((a[0] + TILE_SIZE - 1)/TILE_SIZE))*TILE_SIZE
-        a[1] = math.floor(((a[1] + TILE_SIZE - 1)/TILE_SIZE))*TILE_SIZE
-        b[0] = math.floor(((b[0] + TILE_SIZE - 1)/TILE_SIZE))*TILE_SIZE
-        b[1] = math.floor(((b[1] + TILE_SIZE - 1)/TILE_SIZE))*TILE_SIZE
+        a[0] -= TILE_SIZE
+        a[1] -= TILE_SIZE
+        b[0] -= TILE_SIZE
+        b[1] -= TILE_SIZE
+        a[0] = math.floor(((a[0] + TS2 - 1)/TS2))*TS2
+        a[1] = math.floor(((a[1] + TS2 - 1)/TS2))*TS2
+        b[0] = math.floor(((b[0] + TS2 - 1)/TS2))*TS2
+        b[1] = math.floor(((b[1] + TS2 - 1)/TS2))*TS2
 
         clockwise = random.randint(0, 1) == 1
         dx = b[0] - a[0]
@@ -276,22 +275,20 @@ class Dugeon(object):
 
     def clip_rooms(self, min_x, min_y):
         for r in self.rooms:
-            r.pos[0] += abs(min_x) + TILE_SIZE
-            r.pos[1] += abs(min_y) + TILE_SIZE
+            r.pos[0] += abs(min_x) + TS2
+            r.pos[1] += abs(min_y) + TS2
             r.rect.topleft = r.pos
 
     def make_walls(self):
         for room in self.rooms:
             x, y = room.rect.topleft
-            x -= TILE_SIZE
-            y -= TILE_SIZE
-            w = int(room.rect.w/TILE_SIZE)+2
-            h = int(room.rect.h/TILE_SIZE)+2
+            w = int(room.rect.w/TS2)
+            h = int(room.rect.h/TS2)
             old_hall = None
             for i in range(w):
                 for j in range(h):
                     if (j > 0 and j < h-1)and (i > 0 and i < w - 1):
-                        y += TILE_SIZE
+                        y += TS2
                         continue
                     wall = Wall((x, y))
                     hit_walls = pg.sprite.spritecollideany(wall, self.walls)
@@ -313,38 +310,46 @@ class Dugeon(object):
                             self.walls.append(wall)
                             self.map_sprites.add(wall)
                             self.map_sprites.change_layer(wall, 6)
-                    y += TILE_SIZE
-                x += TILE_SIZE
-                y = room.rect.top-TILE_SIZE
+                    y += TS2
+                x += TS2
+                y = room.rect.top
         for hall in self.halls:
             x, y = hall.rect.topleft
-            x -= TILE_SIZE
-            y -= TILE_SIZE
-            w = int(hall.rect.w/TILE_SIZE) + 2
-            h = int(hall.rect.h/TILE_SIZE) + 2
+            x -= TS2
+            y -= TS2
+            w = int(hall.rect.w/TS2) + 2
+            h = int(hall.rect.h/TS2) + 2
             for i in range(w):
                 for j in range(h):
                     if (j > 0 and j < h-1)and (i > 0 and i < w - 1):
-                        y += TILE_SIZE
+                        y += TS2
                         continue
                     wall = Wall((x, y))
                     if not pg.sprite.spritecollideany(wall, self.map_sprites):
                         self.walls.append(wall)
                         self.map_sprites.add(wall)
                         self.map_sprites.change_layer(wall, 3)
-                    y += TILE_SIZE
-                x += TILE_SIZE
-                y = hall.rect.top-TILE_SIZE
+                    y += TS2
+                x += TS2
+                y = hall.rect.top-TS2
 
     def remove_useless_doors(self):
         for i in range(len(self.doors)):
             a = self.doors[i]
-            a.rect.inflate_ip(TILE_SIZE, TILE_SIZE)
+            a.rect.inflate_ip(TS2, 0)
+            walls_around = pg.sprite.spritecollide(a, self.walls, False)
+            a.rect.inflate_ip(-TS2, TS2)
+            if len(walls_around) < 2:
+                walls_around = pg.sprite.spritecollide(a, self.walls, False)
+                if len(walls_around) < 2:
+                    a.kill()
+                    continue
+            a.rect.inflate_ip(TS2, 0)
             for j in range(i+1, len(self.doors)):
                 b = self.doors[j]
                 if pg.sprite.collide_rect(a, b) and not b.locked:
                     b.kill()
-            a.rect.inflate_ip(-TILE_SIZE, -TILE_SIZE)
+            a.rect.inflate_ip(-TS2, -TS2)
 
     def handle_input(self, event):
         self.player.handle_input(event)

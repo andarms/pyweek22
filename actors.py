@@ -16,7 +16,7 @@ class Player(pg.sprite.DirtySprite):
     def __init__(self, pos):
         super(Player, self).__init__()
         self.pos = [pos[0], pos[1]]
-        self.image = pg.Surface((20, 20))
+        self.image = pg.Surface((TILE_SIZE, TILE_SIZE))
         self.image.fill((0, 255, 255))
         self.rect = self.image.get_rect(topleft=self.pos)
         self.hit_rect = self.rect.copy()
