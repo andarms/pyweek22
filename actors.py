@@ -1,3 +1,5 @@
+import math
+
 import pygame as pg
 
 from conts import *
@@ -22,6 +24,9 @@ class Player(pg.sprite.DirtySprite):
         self.speed = 200
         self.direction = None
         self.direction_stack = []
+
+        self.face_direction = "down"
+        self.rot_speed = 6 * math.pi / 180
 
     def add_direction(self, direction):
         """
@@ -59,6 +64,20 @@ class Player(pg.sprite.DirtySprite):
         else:
             self.collide = False
 
+    def change_face_direction(self, angle):
+        if self.direction == "UP" or self.direction == "DOWN":
+            if angle > 0:
+                self.face_direction = "DOWN"
+            else:
+                self.face_direction = "UP"
+
+        if self.direction == "LEFT" or self.direction == "RIGHT":
+            if abs(angle) > 90:
+                self.face_direction = "LEFT"
+            else:
+                self.face_direction = "RIGTH"
+        print(self.face_direction)
+
     def handle_input(self, event):
         if event.type == pg.KEYDOWN:
             if event.key in CONTROLS:
@@ -68,13 +87,14 @@ class Player(pg.sprite.DirtySprite):
             if event.key in CONTROLS:
                 self.pop_direction(CONTROLS[event.key])
 
-    def update(self, dt, walls, viewport):
+    def update(self, dt, walls, angle):
         if self.direction_stack:
             direction_vector = DIR_VECTORS[self.direction]
             self.rect.x += direction_vector[0] * self.speed * dt
             self.rect.y += direction_vector[1] * self.speed * dt
             self.hit_rect.center = self.rect.center
         self.check_collitions(walls)
+        self.change_face_direction(angle)
 
     def render(self, surface):
         surface.blit(self.image, self.rect)

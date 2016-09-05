@@ -309,9 +309,12 @@ class Dugeon(object):
             self.cursor.center = event.pos
 
     def update(self, dt):
+        x, y = pg.mouse.get_pos()
+        angle = math.degrees(
+            math.atan2((y-SCREEN_SIZE[1]/2), (x-SCREEN_SIZE[0]/2)))
         visible_walls = pg.sprite.spritecollide(
             self.viewport, self.walls, False)
-        self.player.update(dt, self.walls, self.viewport)
+        self.player.update(dt, self.walls, angle)
         self.viewport.update(self.player, self.rect)
 
     def render(self, surface):
