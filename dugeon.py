@@ -114,6 +114,9 @@ class Dugeon(object):
         self.viewport = Viewport()
         self.viewport.update(self.player, self.rect)
 
+        pg.mouse.set_visible(False)
+        self.cursor = pg.Rect(0, 0, 10, 10)
+
     def separate_cells(self, cells):
         """based on http://fisherevans.com/blog/post/dungeon-generation
         """
@@ -302,11 +305,13 @@ class Dugeon(object):
 
     def handle_input(self, event):
         self.player.handle_input(event)
+        if event.type == pg.MOUSEMOTION:
+            self.cursor.center = event.pos
 
     def update(self, dt):
         visible_walls = pg.sprite.spritecollide(
             self.viewport, self.walls, False)
-        self.player.update(dt, self.walls)
+        self.player.update(dt, self.walls, self.viewport)
         self.viewport.update(self.player, self.rect)
 
     def render(self, surface):
@@ -314,6 +319,7 @@ class Dugeon(object):
         self.map_sprites.draw(self.image)
         self.player.render(self.image)
         surface.blit(self.image, (0, 0), self.viewport)
+        pg.draw.rect(surface, (255, 0, 0), self.cursor)
 
 
 class Viewport(object):

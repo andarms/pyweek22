@@ -11,10 +11,10 @@ MIN_ROOM_W = 10
 MIN_ROOM_H = 8
 
 CONTROLS = {
-    pg.K_UP:  "UP",
-    pg.K_DOWN: "DOWN",
-    pg.K_LEFT:  "LEFT",
-    pg.K_RIGHT: "RIGHT"
+    pg.K_w:  "UP",
+    pg.K_s: "DOWN",
+    pg.K_a:  "LEFT",
+    pg.K_d: "RIGHT"
 }
 
 DIR_VECTORS = {

@@ -68,7 +68,7 @@ class Player(pg.sprite.DirtySprite):
             if event.key in CONTROLS:
                 self.pop_direction(CONTROLS[event.key])
 
-    def update(self, dt, walls):
+    def update(self, dt, walls, viewport):
         if self.direction_stack:
             direction_vector = DIR_VECTORS[self.direction]
             self.rect.x += direction_vector[0] * self.speed * dt
