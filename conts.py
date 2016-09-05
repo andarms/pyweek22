@@ -1,6 +1,6 @@
 import pygame as pg
 
-TILE_SIZE = 24
+TILE_SIZE = 32
 GRID = (160, 96)
 SCREEN_SIZE = (800, 600)
 

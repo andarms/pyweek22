@@ -3,18 +3,19 @@ import pygame as pg
 from conts import *
 
 
-class Player(pg.sprite.Sprite):
+class Player(pg.sprite.DirtySprite):
 
     """docstring for Player"""
 
     def __init__(self, pos):
         super(Player, self).__init__()
-        self.pos = pos
+        self.pos = [pos[0], pos[1]]
         self.image = pg.Surface((20, 20))
         self.image.fill((0, 255, 255))
         self.rect = self.image.get_rect(topleft=self.pos)
         self.direction = None
         self.speed = 200
+        self.layer = 3
 
     def handle_input(self, event):
         if event.type == pg.KEYDOWN:
@@ -27,6 +28,7 @@ class Player(pg.sprite.Sprite):
 
     def update(self, dt):
         if self.direction:
+            self.dirty = 1
             v = DIR_VECTORS[self.direction]
             self.pos[0] += v[0]*self.speed*dt
             self.pos[1] += v[1]*self.speed*dt

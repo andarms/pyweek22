@@ -6,6 +6,8 @@ import pygame as pg
 from conts import *
 from actors import Player
 
+random.seed(7)
+
 
 def get_random_point_in_circle(w, h):
     """  based on
@@ -26,11 +28,38 @@ def get_random_point_in_circle(w, h):
     return [x, y]
 
 
-class Cell():
+class Wall(pg.sprite.DirtySprite):
+
+    """docstring for Wall"""
+
+    def __init__(self, pos,  *groups):
+        super(Wall, self).__init__(*groups)
+        self.pos = pos
+        self.image = pg.Surface((TILE_SIZE, TILE_SIZE))
+        self.image.fill((255, 255, 0))
+        self.rect = self.image.get_rect(topleft=self.pos)
+        self.layer = 1
+
+
+class Hallway(pg.sprite.DirtySprite):
+
+    """docstring for Wall"""
+
+    def __init__(self, rect, *groups):
+        super(Hallway, self).__init__(*groups)
+        self.pos = list(rect.topleft)
+        self.image = pg.Surface((abs(rect.w), abs(rect.h)))
+        self.image.fill((100, 100, 100))
+        self.rect = rect
+        self.layer = 1
+
+
+class Cell(pg.sprite.DirtySprite):
 
     """docstring for RandRoom"""
 
-    def __init__(self):
+    def __init__(self, *groups):
+        super(Cell, self).__init__(*groups)
         self.pos = [0, 0]
         self.pos[0] = GRID[0]*TILE_SIZE/4
         self.pos[1] = GRID[0]*TILE_SIZE/4
@@ -44,9 +73,7 @@ class Cell():
         self.image.fill(self.color)
         self.rect = self.image.get_rect(topleft=self.pos)
         self.seleted = False
-
-    def render(self, surface):
-        surface.blit(self.image, self.rect)
+        self.layer = 3
 
 
 class Dugeon(object):
@@ -57,21 +84,35 @@ class Dugeon(object):
         super(Dugeon, self).__init__()
         self.cells_count = 100
         self.show_paths = True
+        self.map_sprites = pg.sprite.LayeredDirty()
+        self.rooms_group = pg.sprite.LayeredDirty()
+        self.playerGroup = pg.sprite.LayeredDirty()
+        self.visible_sprites = pg.sprite.LayeredDirty()
+
         self.cells = []
         while(len(self.cells) < self.cells_count):
             c = Cell()
             self.cells.append(c)
         area, min_x, min_y = self.separate_cells(self.cells)
         self.rooms = self.select_main_rooms(self.cells)
-        self.paths = self.connet_rooms(self.rooms)
-        # self.make_hallways(self.cells)
 
-        self.image = pg.Surface(
-            (area[0]+MAX_ROOM_W*TILE_SIZE, area[1]+MAX_ROOM_H*TILE_SIZE))
+        w = area[0] + MAX_ROOM_W*TILE_SIZE + TILE_SIZE*2
+        h = area[1] + MAX_ROOM_H*TILE_SIZE + TILE_SIZE*2
+        self.image = pg.Surface((w, h))
+        self.image.fill((0, 0, 0))
         self.rect = self.image.get_rect()
         self.clip_rooms(min_x, min_y)
+        self.halls = self.connet_rooms(self.rooms)
 
-        self.player = Player([0, 0])
+        self.walls = []
+        self.make_walls()
+
+        initial_room = random.choice(self.rooms)
+        initial_room.image.fill([0, 0, 255])
+        final_room = random.choice(self.rooms)
+        final_room.image.fill([0, 255, 0])
+
+        self.player = Player(initial_room.rect.center)
         self.viewport = Viewport()
         self.viewport.update(self.player, self.rect)
 
@@ -128,7 +169,6 @@ class Dugeon(object):
                         a.rect.topleft = a.pos
                         b.rect.topleft = b.pos
         area = ((max_x-min_x), (max_y-min_y))
-        print(area, abs(min_x), abs(min_y))
         return area, min_x, min_y
 
     def select_main_rooms(self, cells):
@@ -136,9 +176,11 @@ class Dugeon(object):
         for room in cells:
             if(room.rect.w > MIN_ROOM_W*TILE_SIZE
                     and room.rect.h > MIN_ROOM_H*TILE_SIZE):
-                room.image.fill([random.randint(0, 255) for _ in range(3)])
                 room.seleted = True
                 seleted.append(room)
+                room.add(self.map_sprites, self.rooms_group)
+                self.map_sprites.change_layer(room, 4)
+
         print("Rooms selected as main rooms %s" % len(seleted))
         return seleted
 
@@ -169,45 +211,96 @@ class Dugeon(object):
         return paths
 
     def create_path(self, p1, p2):
+        # A always left o B
         if(p1[0] < p2[0]):
             a = p1
             b = p2
         else:
             a = p2
             b = p1
-        x, y = a
-        dx = b[0] - x
-        dy = b[1] - y
-        t2 = TILE_SIZE/2
-        # w = random.randint(TILE_SIZE, TILE_SIZE*3)
-        # h = random.randint(TILE_SIZE, TILE_SIZE*3)
-        w = TILE_SIZE*3
-        h = TILE_SIZE*3
-        if(random.randint(0, 1) == 1):
-            r1 = pg.Rect(x, y, dx+w, h)
-            r2 = pg.Rect(x+dx, y, w, dy)
-        else:
-            r1 = pg.Rect(x, (y-TILE_SIZE)+dy, dx+w, h)
-            r2 = pg.Rect(x, y, w, dy)
-        return [r1, r2]
+        a = list(a)
+        b = list(b)
+        w = h = TILE_SIZE*3
+        s2 = TILE_SIZE*1.5
+        # magic o make the perfect centered hallways
+        a[0] -= s2
+        a[1] -= s2
+        b[0] -= s2
+        b[1] -= s2
+        a[0] = math.floor(((a[0] + TILE_SIZE - 1)/TILE_SIZE))*TILE_SIZE
+        a[1] = math.floor(((a[1] + TILE_SIZE - 1)/TILE_SIZE))*TILE_SIZE
+        b[0] = math.floor(((b[0] + TILE_SIZE - 1)/TILE_SIZE))*TILE_SIZE
+        b[1] = math.floor(((b[1] + TILE_SIZE - 1)/TILE_SIZE))*TILE_SIZE
 
-    def make_hallways(self, rooms):
-        for r in self.cells:
-            if r.seleted:
-                continue
-            if r.rect.collidelist(self.paths) > 0:
-                r.image.fill([100, 100, 100])
-                r.seleted = True
-        print("main rooms %s" % len(self.rooms))
+        clockwise = random.randint(0, 1) == 1
+        dx = b[0] - a[0]
+        # A avobe B
+        if (a[1] < b[1]):
+            dy = b[1] - a[1]
+            if clockwise:
+                r1 = pg.Rect(a[0], a[1], dx+w, h)
+                r2 = pg.Rect(b[0], a[1], w, dy)
+            else:
+                r1 = pg.Rect(a[0], a[1], w, dy+h)
+                r2 = pg.Rect(a[0], b[1], dx+w, h)
+        else:
+            dy = a[1] - b[1]
+            if clockwise:
+                r1 = pg.Rect(b[0], b[1], w, dy+h)
+                r2 = pg.Rect(a[0], a[1], dx+w, h)
+            else:
+                r1 = pg.Rect(a[0], b[1], dx+w, h)
+                r2 = pg.Rect(a[0], b[1], w, dy+h)
+
+        h1 = Hallway(r1, self.map_sprites)
+        h2 = Hallway(r2, self.map_sprites)
+        return [h1, h2]
 
     def clip_rooms(self, min_x, min_y):
         for r in self.rooms:
-            r.pos[0] += abs(min_x)
-            r.pos[1] += abs(min_y)
-            r.rect = r.pos
-        for p in self.paths:
-            p.left += abs(min_x)
-            p.top += abs(min_y)
+            r.pos[0] += abs(min_x) + TILE_SIZE
+            r.pos[1] += abs(min_y) + TILE_SIZE
+            r.rect.topleft = r.pos
+
+    def make_walls(self):
+        for room in self.rooms:
+            x, y = room.rect.topleft
+            x -= TILE_SIZE
+            y -= TILE_SIZE
+            w = int(room.rect.w/TILE_SIZE) + 2
+            h = int(room.rect.h/TILE_SIZE) + 2
+            for i in range(w):
+                for j in range(h):
+                    if (j > 0 and j < h-1)and (i > 0 and i < w - 1):
+                        y += TILE_SIZE
+                        continue
+                    wall = Wall((x, y))
+                    if not pg.sprite.spritecollideany(wall, self.map_sprites):
+                        self.walls.append(wall)
+                        self.map_sprites.add(wall)
+                        self.map_sprites.change_layer(wall, 3)
+                    y += TILE_SIZE
+                x += TILE_SIZE
+                y = room.rect.top-TILE_SIZE
+        for hall in self.halls:
+            x, y = hall.rect.topleft
+            x -= TILE_SIZE
+            y -= TILE_SIZE
+            w = int(hall.rect.w/TILE_SIZE) + 2
+            h = int(hall.rect.h/TILE_SIZE) + 2
+            for i in range(w):
+                for j in range(h):
+                    if (j > 0 and j < h-1)and (i > 0 and i < w - 1):
+                        y += TILE_SIZE
+                        continue
+                    wall = Wall((x, y))
+                    if not pg.sprite.spritecollideany(wall, self.map_sprites):
+                        self.walls.append(wall)
+                        self.map_sprites.add(wall)
+                        self.map_sprites.change_layer(wall, 3)
+                    y += TILE_SIZE
+                x += TILE_SIZE
+                y = hall.rect.top-TILE_SIZE
 
     def handle_input(self, event):
         self.player.handle_input(event)
@@ -217,13 +310,8 @@ class Dugeon(object):
         self.viewport.update(self.player, self.rect)
 
     def render(self, surface):
-        self.image.fill((0, 0, 0))
-        if self.show_paths:
-            for p in self.paths:
-                pg.draw.rect(self.image, (200, 100, 100), p)
-        for c in self.cells:
-            if c.seleted:
-                c.render(self.image)
+        self.map_sprites.repaint_rect(self.viewport)
+        self.map_sprites.draw(self.image)
         self.player.render(self.image)
         surface.blit(self.image, (0, 0), self.viewport)
 
