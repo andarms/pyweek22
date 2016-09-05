@@ -76,7 +76,6 @@ class Player(pg.sprite.DirtySprite):
                 self.face_direction = "LEFT"
             else:
                 self.face_direction = "RIGTH"
-        print(self.face_direction)
 
     def handle_input(self, event):
         if event.type == pg.KEYDOWN:

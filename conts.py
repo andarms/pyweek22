@@ -2,13 +2,13 @@ import pygame as pg
 
 TILE_SIZE = 32
 GRID = (160, 96)
-SCREEN_SIZE = (800, 600)
+SCREEN_SIZE = (960, 600)
 
 
-MAX_ROOM_W = 18
-MAX_ROOM_H = 15
-MIN_ROOM_W = 10
-MIN_ROOM_H = 8
+MAX_ROOM_W = 25
+MAX_ROOM_H = 18
+MIN_ROOM_W = 15
+MIN_ROOM_H = 12
 
 CONTROLS = {
     pg.K_w:  "UP",

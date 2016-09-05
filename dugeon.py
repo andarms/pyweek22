@@ -39,6 +39,20 @@ class Wall(pg.sprite.DirtySprite):
         self.layer = 1
 
 
+class Door(pg.sprite.DirtySprite):
+
+    """docstring for Wall"""
+
+    def __init__(self, pos,  *groups):
+        super(Door, self).__init__(*groups)
+        self.pos = pos
+        self.image = pg.Surface((TILE_SIZE, TILE_SIZE))
+        self.image.fill((0, 0, 100))
+        self.rect = self.image.get_rect(topleft=self.pos)
+        self.layer = 1
+        self.locked = False
+
+
 class Hallway(pg.sprite.DirtySprite):
 
     """docstring for Wall"""
@@ -80,13 +94,13 @@ class Dugeon(object):
 
     def __init__(self):
         super(Dugeon, self).__init__()
-        self.cells_count = 100
-        self.show_paths = True
+        self.cells_count = 80
         self.map_sprites = pg.sprite.LayeredDirty()
         self.rooms_group = pg.sprite.LayeredDirty()
         self.playerGroup = pg.sprite.LayeredDirty()
         self.visible_sprites = pg.sprite.LayeredDirty()
 
+        self.doors = []
         self.cells = []
         while(len(self.cells) < self.cells_count):
             c = Cell()
@@ -102,15 +116,18 @@ class Dugeon(object):
         self.clip_rooms(min_x, min_y)
         self.halls = self.connet_rooms(self.rooms)
 
+        self.initial_room = random.choice(self.rooms)
+        self.initial_room.image.fill([0, 0, 255])
+        r = self.initial_room
+        while(r == self.initial_room):
+            r = random.choice(self.rooms)
+        self.final_room = r
+        self.final_room.image.fill([0, 255, 0])
+
         self.walls = []
         self.make_walls()
-
-        initial_room = random.choice(self.rooms)
-        initial_room.image.fill([0, 0, 255])
-        final_room = random.choice(self.rooms)
-        final_room.image.fill([0, 255, 0])
-
-        self.player = Player(initial_room.rect.center)
+        self.remove_useless_doors()
+        self.player = Player(self.initial_room.rect.center)
         self.viewport = Viewport()
         self.viewport.update(self.player, self.rect)
 
@@ -221,8 +238,8 @@ class Dugeon(object):
             b = p1
         a = list(a)
         b = list(b)
-        w = h = TILE_SIZE*3
-        s2 = TILE_SIZE*1.5
+        w = h = TILE_SIZE
+        s2 = TILE_SIZE/2
         # magic o make the perfect centered hallways
         a[0] -= s2
         a[1] -= s2
@@ -268,18 +285,34 @@ class Dugeon(object):
             x, y = room.rect.topleft
             x -= TILE_SIZE
             y -= TILE_SIZE
-            w = int(room.rect.w/TILE_SIZE) + 2
-            h = int(room.rect.h/TILE_SIZE) + 2
+            w = int(room.rect.w/TILE_SIZE)+2
+            h = int(room.rect.h/TILE_SIZE)+2
+            old_hall = None
             for i in range(w):
                 for j in range(h):
                     if (j > 0 and j < h-1)and (i > 0 and i < w - 1):
                         y += TILE_SIZE
                         continue
                     wall = Wall((x, y))
-                    if not pg.sprite.spritecollideany(wall, self.map_sprites):
-                        self.walls.append(wall)
-                        self.map_sprites.add(wall)
-                        self.map_sprites.change_layer(wall, 3)
+                    hit_walls = pg.sprite.spritecollideany(wall, self.walls)
+                    hit_rooms = pg.sprite.spritecollideany(
+                        wall, self.rooms_group)
+                    if not hit_walls or not hit_rooms:
+                        hall = pg.sprite.spritecollideany(wall, self.halls)
+                        if hall:
+                            if old_hall != hall:
+                                door = Door((x, y))
+                                self.map_sprites.add(door)
+                                self.map_sprites.change_layer(door, 6)
+                                self.doors.append(door)
+                                old_hall = hall
+                                if room == self.final_room:
+                                    door.locked = False
+                                    door.image.fill((50, 50, 50))
+                        else:
+                            self.walls.append(wall)
+                            self.map_sprites.add(wall)
+                            self.map_sprites.change_layer(wall, 6)
                     y += TILE_SIZE
                 x += TILE_SIZE
                 y = room.rect.top-TILE_SIZE
@@ -302,6 +335,16 @@ class Dugeon(object):
                     y += TILE_SIZE
                 x += TILE_SIZE
                 y = hall.rect.top-TILE_SIZE
+
+    def remove_useless_doors(self):
+        for i in range(len(self.doors)):
+            a = self.doors[i]
+            a.rect.inflate_ip(TILE_SIZE, TILE_SIZE)
+            for j in range(i+1, len(self.doors)):
+                b = self.doors[j]
+                if pg.sprite.collide_rect(a, b) and not b.locked:
+                    b.kill()
+            a.rect.inflate_ip(-TILE_SIZE, -TILE_SIZE)
 
     def handle_input(self, event):
         self.player.handle_input(event)
