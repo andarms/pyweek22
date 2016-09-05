@@ -6,8 +6,6 @@ import pygame as pg
 from conts import *
 from actors import Player
 
-random.seed(7)
-
 
 def get_random_point_in_circle(w, h):
     """  based on
@@ -306,7 +304,9 @@ class Dugeon(object):
         self.player.handle_input(event)
 
     def update(self, dt):
-        self.player.update(dt)
+        visible_walls = pg.sprite.spritecollide(
+            self.viewport, self.walls, False)
+        self.player.update(dt, self.walls)
         self.viewport.update(self.player, self.rect)
 
     def render(self, surface):
