@@ -13,17 +13,20 @@ class Player(pg.sprite.DirtySprite):
 
     """docstring for Player"""
 
-    def __init__(self, pos):
-        super(Player, self).__init__()
+    def __init__(self, pos, *groups):
+        super(Player, self).__init__(*groups)
         self.pos = [pos[0], pos[1]]
         self.image = pg.Surface((TILE_SIZE, TILE_SIZE))
         self.image.fill((0, 255, 255))
+        self.image.convert()
         self.rect = self.image.get_rect(topleft=self.pos)
         self.hit_rect = self.rect.copy()
         self.hit_rect.midbottom = self.rect.midbottom
         self.speed = 200
         self.direction = None
         self.direction_stack = []
+
+        self.layer = 8
 
         self.face_direction = "down"
         self.rot_speed = 6 * math.pi / 180
@@ -48,7 +51,7 @@ class Player(pg.sprite.DirtySprite):
         if self.direction_stack:
             self.direction = self.direction_stack[-1]
 
-    def check_collitions(self, walls):
+    def check_collitions(self, walls, doors):
         wall = pg.sprite.spritecollideany(self, walls, wall_collide)
         if wall:
             if self.direction == "LEFT":
@@ -63,6 +66,9 @@ class Player(pg.sprite.DirtySprite):
             self.collide = True
         else:
             self.collide = False
+        door = pg.sprite.spritecollideany(self, doors, wall_collide)
+        if(door):
+            door.room.spaw_enemies()
 
     def change_face_direction(self, angle):
         if self.direction == "UP" or self.direction == "DOWN":
@@ -77,23 +83,65 @@ class Player(pg.sprite.DirtySprite):
             else:
                 self.face_direction = "RIGTH"
 
+    def shoot(self):
+        x1 = y1 = 0
+        x2 = self.cursor.rect.left - self.rect.left
+        y2 = self.cursor.rect.top - self.rect.top
+        r = math.atan2(y2, x2)
+        b = Bullet(self.rect.center, r)
+
     def handle_input(self, event):
         if event.type == pg.KEYDOWN:
             if event.key in CONTROLS:
                 self.add_direction(CONTROLS[event.key])
 
+        if event.type == pg.MOUSEBUTTONUP:
+            if event.button == 1:
+                self.shoot()
+
         if event.type == pg.KEYUP:
             if event.key in CONTROLS:
                 self.pop_direction(CONTROLS[event.key])
 
-    def update(self, dt, walls, angle):
+    def update(self, dt, walls, doors, cursor):
+        self.cursor = cursor
         if self.direction_stack:
             direction_vector = DIR_VECTORS[self.direction]
             self.rect.x += direction_vector[0] * self.speed * dt
             self.rect.y += direction_vector[1] * self.speed * dt
             self.hit_rect.center = self.rect.center
-        self.check_collitions(walls)
-        self.change_face_direction(angle)
+        self.check_collitions(walls, doors)
+        # self.change_face_direction(angle)
 
     def render(self, surface):
         surface.blit(self.image, self.rect)
+
+
+class Bullet(pg.sprite.Sprite):
+
+    """docstring for Bullet"""
+
+    def __init__(self, pos, angle, *groups):
+        super(Bullet, self).__init__(*groups)
+        # angle = math.radians(angle)
+        self.add(BULLETS_GROUP)
+        self.lifetime = 1  # seg
+        self.color = (255, 255, 0)
+        w, h = (10, 10)
+        self.image = pg.Surface((w, h))
+        self.image.fill(self.color)
+        self.image.convert()
+        self.rect = self.image.get_rect(center=pos)
+        self.time = 0.0
+        self.speed = 450
+        self.dx = math.cos(angle) * self.speed
+        self.dy = math.sin(angle) * self.speed
+        self.dirty = 2
+        self.layer = 9
+
+    def update(self, dt):
+        self.time += dt
+        if self.time > self.lifetime:
+            self.kill()
+        self.rect.centerx += self.dx * dt
+        self.rect.centery += self.dy * dt

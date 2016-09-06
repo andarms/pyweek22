@@ -26,6 +26,26 @@ def get_random_point_in_circle(w, h):
     return [x, y]
 
 
+class Cursor(pg.sprite.DirtySprite):
+
+    """docstring for Wall"""
+
+    def __init__(self, pos,  *groups):
+        super(Cursor, self).__init__(*groups)
+        self.pos = pos
+        self.image = pg.Surface((20, 20))
+        self.image.fill((255, 255, 255))
+        self.image.convert()
+        self.rect = self.image.get_rect(topleft=self.pos)
+        self.layer = 1
+        self.angle = 0
+
+    def update(self, viewport):
+        x1, y1 = pg.mouse.get_pos()
+        x2, y2 = viewport.rect.topleft
+        self.rect.center = (x1+x2, y1+y2)
+
+
 class Wall(pg.sprite.DirtySprite):
 
     """docstring for Wall"""
@@ -35,6 +55,7 @@ class Wall(pg.sprite.DirtySprite):
         self.pos = pos
         self.image = pg.Surface((TS2, TS2))
         self.image.fill((255, 255, 0))
+        self.image.convert()
         self.rect = self.image.get_rect(topleft=self.pos)
         self.layer = 1
 
@@ -48,9 +69,12 @@ class Door(pg.sprite.DirtySprite):
         self.pos = pos
         self.image = pg.Surface((TS2, TS2))
         self.image.fill((0, 0, 100))
+        self.image.convert()
         self.rect = self.image.get_rect(topleft=self.pos)
         self.layer = 1
         self.locked = False
+        self.opened = False
+        self.room = None
 
 
 class Hallway(pg.sprite.DirtySprite):
@@ -62,6 +86,7 @@ class Hallway(pg.sprite.DirtySprite):
         self.pos = list(rect.topleft)
         self.image = pg.Surface((abs(rect.w), abs(rect.h)))
         self.image.fill((100, 100, 100))
+        self.image.convert()
         self.rect = rect
         self.layer = 1
 
@@ -83,9 +108,17 @@ class Cell(pg.sprite.DirtySprite):
         self.color = [100, 100, 100]
         self.image = pg.Surface((w, h))
         self.image.fill(self.color)
+        self.image.convert()
         self.rect = self.image.get_rect(topleft=self.pos)
         self.seleted = False
-        self.layer = 3
+        self.spawed = False
+        self.layer = 1
+
+    def spaw_enemies(self):
+        if not self.spawed:
+            enemies = random.randint(MIN_ROOM_H, self.rect.w+self.rect.h)
+            print("enemies in room %s " % enemies)
+            self.spawed = True
 
 
 class Dugeon(object):
@@ -97,6 +130,7 @@ class Dugeon(object):
         self.cells_count = 150
         self.map_sprites = pg.sprite.LayeredDirty()
         self.rooms_group = pg.sprite.LayeredDirty()
+        self.doors_group = pg.sprite.LayeredDirty()
         self.playerGroup = pg.sprite.LayeredDirty()
         self.visible_sprites = pg.sprite.LayeredDirty()
 
@@ -107,6 +141,8 @@ class Dugeon(object):
             self.cells.append(c)
         self.rooms = self.select_main_rooms(self.cells)
         area, min_x, min_y = self.separate_cells(self.rooms)
+
+        print(area)
 
         w = area[0] + MAX_ROOM_W*TS2 + TS2
         h = area[1] + MAX_ROOM_H*TS2 + TS2
@@ -127,12 +163,15 @@ class Dugeon(object):
         self.walls = []
         self.make_walls()
         self.remove_useless_doors()
-        self.player = Player(self.initial_room.rect.center)
+        self.player = Player(self.initial_room.rect.center, self.map_sprites)
         self.viewport = Viewport()
         self.viewport.update(self.player, self.rect)
 
-        pg.mouse.set_visible(False)
-        self.cursor = pg.Rect(0, 0, 10, 10)
+        # Custom Cursor
+        # pg.mouse.set_visible(False)
+        self.cursor = Cursor((0, 0), self.map_sprites)
+        self.cursor.update(self.viewport)
+        self.map_sprites.change_layer(self.cursor, 9)
 
     def separate_cells(self, cells):
         """based on http://fisherevans.com/blog/post/dungeon-generation
@@ -299,9 +338,10 @@ class Dugeon(object):
                         if hall:
                             if old_hall != hall:
                                 door = Door((x, y))
-                                self.map_sprites.add(door)
+                                door.add(self.doors_group, self.map_sprites)
                                 self.map_sprites.change_layer(door, 6)
                                 self.doors.append(door)
+                                door.room = room
                                 old_hall = hall
                                 if room == self.final_room:
                                     door.locked = False
@@ -353,24 +393,35 @@ class Dugeon(object):
 
     def handle_input(self, event):
         self.player.handle_input(event)
-        if event.type == pg.MOUSEMOTION:
-            self.cursor.center = event.pos
+        # if event.type == pg.MOUSEMOTION:
+        #     print(x1+x2, y1+y2)
 
     def update(self, dt):
-        x, y = pg.mouse.get_pos()
-        angle = math.degrees(
-            math.atan2((y-SCREEN_SIZE[1]/2), (x-SCREEN_SIZE[0]/2)))
         visible_walls = pg.sprite.spritecollide(
             self.viewport, self.walls, False)
-        self.player.update(dt, self.walls, angle)
+        self.player.update(dt, self.walls, self.doors_group, self.cursor)
         self.viewport.update(self.player, self.rect)
+        # self.cursor.update(self.viewport)
+        x1, y1 = pg.mouse.get_pos()
+        x2, y2 = self.viewport.rect.topleft
+        self.cursor.rect.center = (x1+x2, y1+y2)
+        BULLETS_GROUP.update(dt)
+
+        visible_sprites = pg.sprite.spritecollide(
+            self.viewport, self.map_sprites, False)
+        self.visible_sprites.add(visible_sprites)
+        for sprite in self.visible_sprites.sprites():
+            self.visible_sprites.change_layer(sprite, sprite.layer)
+
+            if sprite not in visible_sprites:
+                self.visible_sprites.remove(sprite)
 
     def render(self, surface):
-        self.map_sprites.repaint_rect(self.viewport)
-        self.map_sprites.draw(self.image)
-        self.player.render(self.image)
+        # self.map_sprites.repaint_rect(self.viewport)
+        self.visible_sprites.draw(self.image)
+        # self.player.render(self.image)
+        BULLETS_GROUP.draw(self.image)
         surface.blit(self.image, (0, 0), self.viewport)
-        pg.draw.rect(surface, (255, 0, 0), self.cursor)
 
 
 class Viewport(object):

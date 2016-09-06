@@ -10,7 +10,7 @@ class Game:
 
     def __init__(self):
 
-        self.fps = 30
+        self.fps = 60
 
         self.screen = pg.display.get_surface()
         self.clock = pg.time.Clock()
@@ -29,7 +29,7 @@ class Game:
                     self.dugeon.show_paths = not self.dugeon.show_paths
 
     def update(self, dt):
-        capition = "Hola mundo - FPS: {:.2f}".format(self.clock.get_fps())
+        capition = "PW22 - FPS: {:.2f}".format(self.clock.get_fps())
         pg.display.set_caption(capition)
         self.dugeon.update(dt)
 

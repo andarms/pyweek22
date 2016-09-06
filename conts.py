@@ -30,3 +30,4 @@ DIR_VECTORS = {
 pg.init()
 SCREEN = pg.display.set_mode(SCREEN_SIZE)
 SCREEN_RECT = SCREEN.get_rect()
+BULLETS_GROUP = pg.sprite.Group()
