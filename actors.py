@@ -1,6 +1,7 @@
 import math
 
 import pygame as pg
+from bulletml import Bullet, BulletML
 
 from conts import *
 
@@ -16,6 +17,7 @@ class Player(pg.sprite.DirtySprite):
     def __init__(self, pos, *groups):
         super(Player, self).__init__(*groups)
         self.pos = [pos[0], pos[1]]
+        self.x, self.y = self.pos
         self.image = pg.Surface((TILE_SIZE, TILE_SIZE))
         self.image.fill((0, 255, 255))
         self.image.convert()
@@ -27,9 +29,15 @@ class Player(pg.sprite.DirtySprite):
         self.direction_stack = []
 
         self.layer = 8
+        self.cooldowntime = 0.3
+        self.cooldown = self.cooldowntime
+        self.cooled = False
 
         self.face_direction = "down"
         self.rot_speed = 6 * math.pi / 180
+
+        self.pattern = BulletML.FromDocument(open("threefire.xml", "rU"))
+        self.bullets = []
 
     def add_direction(self, direction):
         """
@@ -84,11 +92,20 @@ class Player(pg.sprite.DirtySprite):
                 self.face_direction = "RIGTH"
 
     def shoot(self):
-        x1 = y1 = 0
-        x2 = self.cursor.rect.left - self.rect.left
-        y2 = self.cursor.rect.top - self.rect.top
-        r = math.atan2(y2, x2)
-        b = Bullet(self.rect.center, r)
+        if self.cooled:
+            # x1 = y1 = 0
+            # x2 = self.cursor.rect.left - self.rect.left
+            # y2 = self.cursor.rect.top - self.rect.top
+            # angle = math.atan2(y2, x2)
+            # b = Bullet(self.rect.center, angle)
+            # # for i in range(0, 180, 20):
+            # #     Bullet(self.rect.center, math.radians(i))
+            # self.cooldown = self.cooldowntime
+            # self.cooled = False
+            bullet = SimpleBullet.FromDocument(
+                self.pattern, self.x, self.y, target=self.cursor)
+            self.bullets.extend([bullet])
+            bullet.vanished = True
 
     def handle_input(self, event):
         if event.type == pg.KEYDOWN:
@@ -111,37 +128,92 @@ class Player(pg.sprite.DirtySprite):
             self.rect.y += direction_vector[1] * self.speed * dt
             self.hit_rect.center = self.rect.center
         self.check_collitions(walls, doors)
+        self.x, self.y = self.hit_rect.center
+        if(self.bullets):
+            for bullet in self.bullets:
+                self.bullets.extend(bullet.step())
+        self.cooldown -= dt
+        if self.cooldown < 0:
+            self.cooled = True
+
         # self.change_face_direction(angle)
+        for b in self.bullets:
+            b.update(dt)
 
     def render(self, surface):
         surface.blit(self.image, self.rect)
+        for b in self.bullets:
+            if not b.vanished:
+                surface.blit(b.image, (b.x, b.y))
 
 
-class Bullet(pg.sprite.Sprite):
+class Enemie(pg.sprite.Sprite):
+
+    """docstring for Enemie"""
+
+    def __init__(self, pos):
+        super(Enemie, self).__init__()
+        self.x, y = pos
+        self.cooldowntime = 0.3
+        self.cooldown = self.cooldowntime
+        self.cooled = False
+        self.image = pg.Surface((TILE_SIZE, TILE_SIZE))
+        self.image.fill((255, 0, 255))
+        self.image.convert()
+        self.rect = self.image.get_rect(topleft=pos)
+        self.hit_rect = self.rect.copy()
+        self.hit_rect.midbottom = self.rect.midbottom
+
+    def update(self, dt, player):
+        if cooled:
+            bullet = SimpleBullet.FromDocument(
+                self.pattern, self.x, self.y, target=player)
+            self.bullets.extend([bullet])
+            bullet.vanished = True
+
+        self.cooldown -= dt
+        if self.cooldown < 0:
+            self.cooled = True
+
+        if(self.bullets):
+            for bullet in self.bullets:
+                self.bullets.extend(bullet.step())
+
+    def render(self, surface):
+        surface.blit(self.image, self.rect)
+        for b in self.bullets:
+            if not b.vanished:
+                surface.blit(b.image, (b.x, b.y))
+
+
+class SimpleBullet(Bullet):
 
     """docstring for Bullet"""
 
-    def __init__(self, pos, angle, *groups):
-        super(Bullet, self).__init__(*groups)
-        # angle = math.radians(angle)
-        self.add(BULLETS_GROUP)
-        self.lifetime = 1  # seg
+    def __init__(self, x=0, y=0, direction=0, speed=0, target=None,
+                 actions=(), rank=0.5, tags=(), appearance=None,
+                 radius=0.5):
+        self.radius = 2
+        self.speed = speed
+        super(SimpleBullet, self).__init__(x, y, direction, self.speed, target,
+                                           actions, rank, tags, appearance,
+                                           self.radius)
+
         self.color = (255, 255, 0)
-        w, h = (10, 10)
+        w, h = (20, 20)
         self.image = pg.Surface((w, h))
         self.image.fill(self.color)
         self.image.convert()
-        self.rect = self.image.get_rect(center=pos)
         self.time = 0.0
-        self.speed = 450
-        self.dx = math.cos(angle) * self.speed
-        self.dy = math.sin(angle) * self.speed
-        self.dirty = 2
+        self.lifetime = 5
+        # self.speed = 450
+        # self.dx = math.cos(angle) * self.speed
+        # self.dy = math.sin(angle) * self.speed
+        # self.dirty = 2
         self.layer = 9
 
     def update(self, dt):
         self.time += dt
         if self.time > self.lifetime:
-            self.kill()
-        self.rect.centerx += self.dx * dt
-        self.rect.centery += self.dy * dt
+            # self.kill()
+            self.vanished = True

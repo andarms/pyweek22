@@ -4,7 +4,7 @@ import random
 import pygame as pg
 
 from conts import *
-from actors import Player
+from actors import Player, Enemie
 
 
 def get_random_point_in_circle(w, h):
@@ -35,15 +35,17 @@ class Cursor(pg.sprite.DirtySprite):
         self.pos = pos
         self.image = pg.Surface((20, 20))
         self.image.fill((255, 255, 255))
-        self.image.convert()
+        self.image.convert_alpha()
         self.rect = self.image.get_rect(topleft=self.pos)
         self.layer = 1
         self.angle = 0
+        self.x, self.y = 0, 0
 
     def update(self, viewport):
         x1, y1 = pg.mouse.get_pos()
         x2, y2 = viewport.rect.topleft
         self.rect.center = (x1+x2, y1+y2)
+        self.x, self.y = self.rect.topleft
 
 
 class Wall(pg.sprite.DirtySprite):
@@ -55,7 +57,7 @@ class Wall(pg.sprite.DirtySprite):
         self.pos = pos
         self.image = pg.Surface((TS2, TS2))
         self.image.fill((255, 255, 0))
-        self.image.convert()
+        self.image.convert_alpha()
         self.rect = self.image.get_rect(topleft=self.pos)
         self.layer = 1
 
@@ -69,7 +71,7 @@ class Door(pg.sprite.DirtySprite):
         self.pos = pos
         self.image = pg.Surface((TS2, TS2))
         self.image.fill((0, 0, 100))
-        self.image.convert()
+        self.image.convert_alpha()
         self.rect = self.image.get_rect(topleft=self.pos)
         self.layer = 1
         self.locked = False
@@ -86,7 +88,7 @@ class Hallway(pg.sprite.DirtySprite):
         self.pos = list(rect.topleft)
         self.image = pg.Surface((abs(rect.w), abs(rect.h)))
         self.image.fill((100, 100, 100))
-        self.image.convert()
+        self.image.convert_alpha()
         self.rect = rect
         self.layer = 1
 
@@ -108,7 +110,7 @@ class Cell(pg.sprite.DirtySprite):
         self.color = [100, 100, 100]
         self.image = pg.Surface((w, h))
         self.image.fill(self.color)
-        self.image.convert()
+        self.image.convert_alpha()
         self.rect = self.image.get_rect(topleft=self.pos)
         self.seleted = False
         self.spawed = False
@@ -116,8 +118,11 @@ class Cell(pg.sprite.DirtySprite):
 
     def spaw_enemies(self):
         if not self.spawed:
-            enemies = random.randint(MIN_ROOM_H, self.rect.w+self.rect.h)
-            print("enemies in room %s " % enemies)
+            enemies = random.randint(0, MAX_ROOM_H)
+            for i in range(enemies):
+                x = random.randint(self.rect.left, self.rect.right-TILE_SIZE)
+                y = random.randint(self.rect.top, self.rect.bottom-TILE_SIZE)
+                e = Enemie((x, y))
             self.spawed = True
 
 
@@ -127,7 +132,7 @@ class Dugeon(object):
 
     def __init__(self):
         super(Dugeon, self).__init__()
-        self.cells_count = 150
+        self.cells_count = 200
         self.map_sprites = pg.sprite.LayeredDirty()
         self.rooms_group = pg.sprite.LayeredDirty()
         self.doors_group = pg.sprite.LayeredDirty()
@@ -163,7 +168,7 @@ class Dugeon(object):
         self.walls = []
         self.make_walls()
         self.remove_useless_doors()
-        self.player = Player(self.initial_room.rect.center, self.map_sprites)
+        self.player = Player(self.initial_room.rect.center)
         self.viewport = Viewport()
         self.viewport.update(self.player, self.rect)
 
@@ -401,10 +406,7 @@ class Dugeon(object):
             self.viewport, self.walls, False)
         self.player.update(dt, self.walls, self.doors_group, self.cursor)
         self.viewport.update(self.player, self.rect)
-        # self.cursor.update(self.viewport)
-        x1, y1 = pg.mouse.get_pos()
-        x2, y2 = self.viewport.rect.topleft
-        self.cursor.rect.center = (x1+x2, y1+y2)
+        self.cursor.update(self.viewport)
         BULLETS_GROUP.update(dt)
 
         visible_sprites = pg.sprite.spritecollide(
@@ -419,9 +421,10 @@ class Dugeon(object):
     def render(self, surface):
         # self.map_sprites.repaint_rect(self.viewport)
         self.visible_sprites.draw(self.image)
-        # self.player.render(self.image)
+        self.player.render(self.image)
         BULLETS_GROUP.draw(self.image)
         surface.blit(self.image, (0, 0), self.viewport)
+        self.viewport.render(surface)
 
 
 class Viewport(object):
@@ -430,7 +433,15 @@ class Viewport(object):
 
     def __init__(self):
         self.rect = SCREEN_RECT.copy()
+        self.image = pg.Surface((self.rect.w, self.rect.h))
+        self.image.fill((0, 0, 0))
+        self.image.set_alpha(100)
+        self.image.convert_alpha()
 
     def update(self, player, screen_rect):
         self.rect.center = player.rect.center
         self.rect.clamp_ip(screen_rect)
+
+    def render(self, surface):
+        # surface.blit(self.image, (0, 0))
+        pass
