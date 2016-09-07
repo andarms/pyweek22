@@ -18,12 +18,6 @@ class Player(pg.sprite.DirtySprite):
         super(Player, self).__init__(*groups)
         self.pos = [pos[0], pos[1]]
         self.x, self.y = self.pos
-        self.image = pg.Surface((TILE_SIZE, TILE_SIZE))
-        self.image.fill((0, 255, 255))
-        self.image.convert()
-        self.rect = self.image.get_rect(topleft=self.pos)
-        self.hit_rect = self.rect.copy()
-        self.hit_rect.midbottom = self.rect.midbottom
         self.speed = 200
         self.direction = None
         self.direction_stack = []
@@ -38,6 +32,24 @@ class Player(pg.sprite.DirtySprite):
 
         self.pattern = BulletML.FromDocument(open("threefire.xml", "rU"))
         self.bullets = []
+
+        frames = self.get_frames("hero")
+        self.image = frames[0][0]
+        self.rect = self.image.get_rect(topleft=self.pos)
+        self.hit_rect = pg.Rect(0, 0, TILE_SIZE, TILE_SIZE)
+        self.hit_rect.center = self.rect.center
+
+    def make_frame_dict(self, frames):
+        frame_dict = {}
+        for i, direct in enumerate(DIRECTIONS):
+            self.idelframes[direct] = frames[i][0]
+            frame_dict[direct] = itertools.cycle(frames[i])
+        return frame_dict
+
+    def get_frames(self, spritesheet):
+        sheet = GFX[spritesheet]
+        all_frames = split_sheet(sheet, (48, 128), 4, 1)
+        return all_frames
 
     def add_direction(self, direction):
         """
@@ -77,6 +89,7 @@ class Player(pg.sprite.DirtySprite):
         door = pg.sprite.spritecollideany(self, doors, wall_collide)
         if(door):
             door.room.spaw_enemies()
+            door.open()
 
     def change_face_direction(self, angle):
         if self.direction == "UP" or self.direction == "DOWN":
@@ -162,7 +175,7 @@ class Enemie(pg.sprite.Sprite):
         self.image.convert()
         self.rect = self.image.get_rect(topleft=pos)
         self.hit_rect = self.rect.copy()
-        self.hit_rect.midbottom = self.rect.midbottom
+        self.hit_rect.center = self.rect.center
 
     def update(self, dt, player):
         if cooled:

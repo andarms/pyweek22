@@ -7,6 +7,9 @@ from conts import *
 from actors import Player, Enemie
 
 
+TILES = split_sheet(GFX['tiles'], (128, 128), 6, 1)
+
+
 def get_random_point_in_circle(w, h):
     """  based on
     http://www.gamasutra.com/blogs/AAdonaac/20150903/252889/Procedural_Dungeon_Generation_Algorithm.php
@@ -35,7 +38,7 @@ class Cursor(pg.sprite.DirtySprite):
         self.pos = pos
         self.image = pg.Surface((20, 20))
         self.image.fill((255, 255, 255))
-        self.image.convert_alpha()
+
         self.rect = self.image.get_rect(topleft=self.pos)
         self.layer = 1
         self.angle = 0
@@ -57,7 +60,7 @@ class Wall(pg.sprite.DirtySprite):
         self.pos = pos
         self.image = pg.Surface((TS2, TS2))
         self.image.fill((255, 255, 0))
-        self.image.convert_alpha()
+
         self.rect = self.image.get_rect(topleft=self.pos)
         self.layer = 1
 
@@ -66,17 +69,27 @@ class Door(pg.sprite.DirtySprite):
 
     """docstring for Wall"""
 
-    def __init__(self, pos,  *groups):
+    def __init__(self, pos, i, j, w, h, * groups):
         super(Door, self).__init__(*groups)
         self.pos = pos
-        self.image = pg.Surface((TS2, TS2))
-        self.image.fill((0, 0, 100))
-        self.image.convert_alpha()
+        if j == 0 or j == h-1:
+            self.image = TILES[0][0].copy()
+            self.open_image = TILES[0][1].copy()
+        elif i > 0:
+            self.image = TILES[0][3].copy()
+            self.open_image = TILES[0][2].copy()
+        else:
+            self.image = TILES[0][4].copy()
+            self.open_image = TILES[0][5].copy()
         self.rect = self.image.get_rect(topleft=self.pos)
         self.layer = 1
         self.locked = False
         self.opened = False
         self.room = None
+
+    def open(self):
+        self.opened = True
+        self.image = self.open_image
 
 
 class Hallway(pg.sprite.DirtySprite):
@@ -88,7 +101,7 @@ class Hallway(pg.sprite.DirtySprite):
         self.pos = list(rect.topleft)
         self.image = pg.Surface((abs(rect.w), abs(rect.h)))
         self.image.fill((100, 100, 100))
-        self.image.convert_alpha()
+
         self.rect = rect
         self.layer = 1
 
@@ -110,7 +123,7 @@ class Cell(pg.sprite.DirtySprite):
         self.color = [100, 100, 100]
         self.image = pg.Surface((w, h))
         self.image.fill(self.color)
-        self.image.convert_alpha()
+
         self.rect = self.image.get_rect(topleft=self.pos)
         self.seleted = False
         self.spawed = False
@@ -132,11 +145,11 @@ class Dugeon(object):
 
     def __init__(self):
         super(Dugeon, self).__init__()
-        self.cells_count = 200
+        self.cells_count = 100
         self.map_sprites = pg.sprite.LayeredDirty()
         self.rooms_group = pg.sprite.LayeredDirty()
         self.doors_group = pg.sprite.LayeredDirty()
-        self.playerGroup = pg.sprite.LayeredDirty()
+        self.backgound = pg.sprite.LayeredDirty()
         self.visible_sprites = pg.sprite.LayeredDirty()
 
         self.doors = []
@@ -168,7 +181,7 @@ class Dugeon(object):
         self.walls = []
         self.make_walls()
         self.remove_useless_doors()
-        self.player = Player(self.initial_room.rect.center)
+        self.player = Player(self.initial_room.rect.center, self.map_sprites)
         self.viewport = Viewport()
         self.viewport.update(self.player, self.rect)
 
@@ -240,8 +253,7 @@ class Dugeon(object):
                     and room.rect.h > MIN_ROOM_H*TS2):
                 room.seleted = True
                 seleted.append(room)
-                room.add(self.map_sprites, self.rooms_group)
-                self.map_sprites.change_layer(room, 4)
+                room.add(self.map_sprites, self.rooms_group, self.backgound)
 
         print("Rooms selected as main rooms %s" % len(seleted))
         return seleted
@@ -313,8 +325,8 @@ class Dugeon(object):
                 r1 = pg.Rect(a[0], b[1], dx+w, h)
                 r2 = pg.Rect(a[0], b[1], w, dy+h)
 
-        h1 = Hallway(r1, self.map_sprites)
-        h2 = Hallway(r2, self.map_sprites)
+        h1 = Hallway(r1, self.map_sprites, self.backgound)
+        h2 = Hallway(r2, self.map_sprites, self.backgound)
         return [h1, h2]
 
     def clip_rooms(self, min_x, min_y):
@@ -342,7 +354,7 @@ class Dugeon(object):
                         hall = pg.sprite.spritecollideany(wall, self.halls)
                         if hall:
                             if old_hall != hall:
-                                door = Door((x, y))
+                                door = Door((x, y), i, j, w, h)
                                 door.add(self.doors_group, self.map_sprites)
                                 self.map_sprites.change_layer(door, 6)
                                 self.doors.append(door)
@@ -350,7 +362,6 @@ class Dugeon(object):
                                 old_hall = hall
                                 if room == self.final_room:
                                     door.locked = False
-                                    door.image.fill((50, 50, 50))
                         else:
                             self.walls.append(wall)
                             self.map_sprites.add(wall)
@@ -413,7 +424,12 @@ class Dugeon(object):
             self.viewport, self.map_sprites, False)
         self.visible_sprites.add(visible_sprites)
         for sprite in self.visible_sprites.sprites():
-            self.visible_sprites.change_layer(sprite, sprite.layer)
+            if not sprite in self.backgound:
+                self.visible_sprites.change_layer(sprite, sprite.rect.bottom)
+            else:
+                self.visible_sprites.change_layer(sprite, sprite.layer)
+
+            self.visible_sprites.change_layer(self.cursor, 9999)
 
             if sprite not in visible_sprites:
                 self.visible_sprites.remove(sprite)
@@ -421,7 +437,7 @@ class Dugeon(object):
     def render(self, surface):
         # self.map_sprites.repaint_rect(self.viewport)
         self.visible_sprites.draw(self.image)
-        self.player.render(self.image)
+        # self.player.render(self.image)
         BULLETS_GROUP.draw(self.image)
         surface.blit(self.image, (0, 0), self.viewport)
         self.viewport.render(surface)
@@ -435,8 +451,7 @@ class Viewport(object):
         self.rect = SCREEN_RECT.copy()
         self.image = pg.Surface((self.rect.w, self.rect.h))
         self.image.fill((0, 0, 0))
-        self.image.set_alpha(100)
-        self.image.convert_alpha()
+        # self.image.set_alpha(100)
 
     def update(self, player, screen_rect):
         self.rect.center = player.rect.center
