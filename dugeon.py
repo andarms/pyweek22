@@ -7,7 +7,7 @@ from conts import *
 from actors import Player, Enemie
 
 
-TILES = split_sheet(GFX['tiles'], (128, 128), 6, 1)
+TILES = split_sheet(GFX['tiles'], (128, 128), 6, 2)
 
 
 def get_random_point_in_circle(w, h):
@@ -58,9 +58,7 @@ class Wall(pg.sprite.DirtySprite):
     def __init__(self, pos,  *groups):
         super(Wall, self).__init__(*groups)
         self.pos = pos
-        self.image = pg.Surface((TS2, TS2))
-        self.image.fill((255, 255, 0))
-
+        self.image = TILES[1][0]
         self.rect = self.image.get_rect(topleft=self.pos)
         self.layer = 1
 
@@ -75,12 +73,11 @@ class Door(pg.sprite.DirtySprite):
         if j == 0 or j == h-1:
             self.image = TILES[0][0].copy()
             self.open_image = TILES[0][1].copy()
-        elif i > 0:
+            self.locked_image = TILES[0][4].copy()
+        else:
             self.image = TILES[0][3].copy()
             self.open_image = TILES[0][2].copy()
-        else:
-            self.image = TILES[0][4].copy()
-            self.open_image = TILES[0][5].copy()
+            self.locked_image = TILES[0][5].copy()
         self.rect = self.image.get_rect(topleft=self.pos)
         self.layer = 1
         self.locked = False
@@ -361,7 +358,8 @@ class Dugeon(object):
                                 door.room = room
                                 old_hall = hall
                                 if room == self.final_room:
-                                    door.locked = False
+                                    door.locked = True
+                                    door.image = door.locked_image
                         else:
                             self.walls.append(wall)
                             self.map_sprites.add(wall)
@@ -425,7 +423,7 @@ class Dugeon(object):
         self.visible_sprites.add(visible_sprites)
         for sprite in self.visible_sprites.sprites():
             if not sprite in self.backgound:
-                self.visible_sprites.change_layer(sprite, sprite.rect.bottom)
+                self.visible_sprites.change_layer(sprite, sprite.rect.centery)
             else:
                 self.visible_sprites.change_layer(sprite, sprite.layer)
 

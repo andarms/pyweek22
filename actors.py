@@ -1,4 +1,5 @@
 import math
+from itertools import cycle
 
 import pygame as pg
 from bulletml import Bullet, BulletML
@@ -18,22 +19,29 @@ class Player(pg.sprite.DirtySprite):
         super(Player, self).__init__(*groups)
         self.pos = [pos[0], pos[1]]
         self.x, self.y = self.pos
-        self.speed = 200
+        self.layer = 8
+
+        # movement
         self.direction = None
         self.direction_stack = []
+        self.face_direction = "RIGHT"
+        self.old_direction = self.face_direction
+        self.speed = 200
 
-        self.layer = 8
+        # Armo
+        self.pattern = BulletML.FromDocument(open("threefire.xml", "rU"))
+        self.bullets = []
         self.cooldowntime = 0.3
         self.cooldown = self.cooldowntime
         self.cooled = False
 
-        self.face_direction = "down"
-        self.rot_speed = 6 * math.pi / 180
-
-        self.pattern = BulletML.FromDocument(open("threefire.xml", "rU"))
-        self.bullets = []
-
         frames = self.get_frames("hero")
+        self.idelframes = {}
+        self.frames = self.make_frame_dict(frames)
+        self.walkframes = None
+        self.animate_timer = 0.0
+        self.animate_fps = 10.0
+
         self.image = frames[0][0]
         self.rect = self.image.get_rect(topleft=self.pos)
         self.hit_rect = pg.Rect(0, 0, TILE_SIZE, TILE_SIZE)
@@ -41,9 +49,14 @@ class Player(pg.sprite.DirtySprite):
 
     def make_frame_dict(self, frames):
         frame_dict = {}
-        for i, direct in enumerate(DIRECTIONS):
-            self.idelframes[direct] = frames[i][0]
-            frame_dict[direct] = itertools.cycle(frames[i])
+        self.idelframes['RIGHT'] = frames[0][0]
+        frame_dict["RIGHT"] = cycle(frames[0])
+        left = []
+        for frame in frames[0]:
+            left.append(
+                pg.transform.flip(frame, True, False))
+        self.idelframes['LEFT'] = left[0]
+        frame_dict["LEFT"] = cycle(left)
         return frame_dict
 
     def get_frames(self, spritesheet):
@@ -92,33 +105,32 @@ class Player(pg.sprite.DirtySprite):
             door.open()
 
     def change_face_direction(self, angle):
-        if self.direction == "UP" or self.direction == "DOWN":
-            if angle > 0:
-                self.face_direction = "DOWN"
-            else:
-                self.face_direction = "UP"
-
-        if self.direction == "LEFT" or self.direction == "RIGHT":
-            if abs(angle) > 90:
-                self.face_direction = "LEFT"
-            else:
-                self.face_direction = "RIGTH"
+        # to not convert  to degrees
+        if abs(angle) > 1.5:
+            self.face_direction = "LEFT"
+        else:
+            self.face_direction = "RIGHT"
 
     def shoot(self):
         if self.cooled:
-            # x1 = y1 = 0
-            # x2 = self.cursor.rect.left - self.rect.left
-            # y2 = self.cursor.rect.top - self.rect.top
-            # angle = math.atan2(y2, x2)
-            # b = Bullet(self.rect.center, angle)
-            # # for i in range(0, 180, 20):
-            # #     Bullet(self.rect.center, math.radians(i))
-            # self.cooldown = self.cooldowntime
-            # self.cooled = False
             bullet = SimpleBullet.FromDocument(
                 self.pattern, self.x, self.y, target=self.cursor)
             self.bullets.extend([bullet])
             bullet.vanished = True
+
+    def animate(self, now=0):
+        now = pg.time.get_ticks()
+        if self.face_direction != self.old_direction:
+            self.walkframes = self.frames[self.face_direction]
+            self.old_direction = self.face_direction
+            self.dirty = 1
+        if self.dirty or now-self.animate_timer > 1000/self.animate_fps:
+            if self.direction_stack:
+                self.image = next(self.walkframes)
+                self.animate_timer = now
+                self.dirty = 0
+            else:
+                self.image = self.idelframes[self.face_direction]
 
     def handle_input(self, event):
         if event.type == pg.KEYDOWN:
@@ -142,16 +154,23 @@ class Player(pg.sprite.DirtySprite):
             self.hit_rect.center = self.rect.center
         self.check_collitions(walls, doors)
         self.x, self.y = self.hit_rect.center
+
+        # Bullets
         if(self.bullets):
             for bullet in self.bullets:
                 self.bullets.extend(bullet.step())
+                bullet.update(dt)
         self.cooldown -= dt
         if self.cooldown < 0:
             self.cooled = True
 
-        # self.change_face_direction(angle)
-        for b in self.bullets:
-            b.update(dt)
+        # Direction
+        x = self.cursor.rect.left - self.rect.left
+        y = self.cursor.rect.top - self.rect.top
+        self.angle = math.atan2(y, x)
+        self.change_face_direction(self.angle)
+
+        self.animate()
 
     def render(self, surface):
         surface.blit(self.image, self.rect)
