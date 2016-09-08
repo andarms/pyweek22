@@ -3,6 +3,7 @@ import pygame as pg
 
 TILE_SIZE = 32
 TS2 = TILE_SIZE*4
+TS4 = TS2*2
 GRID = (160, 96)
 SCREEN_SIZE = (1024, 768)
 
@@ -89,6 +90,7 @@ SCREEN = pg.display.set_mode(SCREEN_SIZE)
 SCREEN_RECT = SCREEN.get_rect()
 BULLETS_GROUP = pg.sprite.Group()
 ENEMIES_GROUP = pg.sprite.LayeredDirty()
+DECORATOR_GROUP = pg.sprite.LayeredDirty()
 ALL_SPRITES = pg.sprite.LayeredDirty()
 
 

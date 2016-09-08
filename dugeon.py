@@ -1,6 +1,7 @@
 import math
 import random
 
+
 import pygame as pg
 
 from conts import *
@@ -91,17 +92,18 @@ class Door(pg.sprite.DirtySprite):
         super(Door, self).__init__(*groups)
         self.pos = pos
         if j == 0 or j == h-1:
-            self.image = TILES[0][0]
+            self.normal_image = TILES[0][0]
             self.open_image = TILES[0][1]
             self.locked_image = TILES[1][4]
         elif i == 0:
-            self.image = TILES[0][5]
+            self.normal_image = TILES[0][5]
             self.open_image = TILES[0][4]
             self.locked_image = TILES[1][5]
         else:
-            self.image = TILES[0][3]
+            self.normal_image = TILES[0][3]
             self.open_image = TILES[0][2]
             self.locked_image = TILES[2][5]
+        self.image = self.normal_image
         self.rect = self.image.get_rect(topleft=self.pos)
         self.layer = 1
         self.locked = False
@@ -111,6 +113,19 @@ class Door(pg.sprite.DirtySprite):
     def open(self):
         self.opened = True
         self.image = self.open_image
+
+    def lock(self):
+        self.locked = True
+        self.image = self.locked_image
+        self.dirty = 1
+
+    def unlock(self):
+        self.locked = False
+        if self.opened:
+            self.image = self.open_image
+        else:
+            self.image = self.normal_image
+        self.dirty = 1
 
 
 class Hallway(pg.sprite.DirtySprite):
@@ -138,7 +153,7 @@ class Cell(pg.sprite.DirtySprite):
         self.pos = [0, 0]
         self.pos[0] = GRID[0]*TILE_SIZE/4
         self.pos[1] = GRID[0]*TILE_SIZE/4
-        x, y = get_random_point_in_circle(40*TILE_SIZE, TILE_SIZE)
+        x, y = get_random_point_in_circle(40*TILE_SIZE, 10)
         self.pos[0] += x
         self.pos[1] += y
         w = random.choice(range(TS2, TS2*MAX_ROOM_W, TS2))
@@ -151,6 +166,9 @@ class Cell(pg.sprite.DirtySprite):
         self.seleted = False
         self.spawed = False
         self.layer = 1
+        self.figthing = False
+
+        self.doors = []
 
     def generate_image(self):
         for x in range(self.rect.w//TS2):
@@ -159,15 +177,24 @@ class Cell(pg.sprite.DirtySprite):
 
     def spaw_enemies(self):
         if not self.spawed:
-            enemies = random.randint(0, MAX_ROOM_H)
+            enemies = random.randint(3, MAX_ROOM_H)
             for i in range(enemies):
                 x = random.randint(self.rect.left+TS2, self.rect.right-TS2)
                 y = random.randint(self.rect.top+TS2, self.rect.bottom-TS2)
                 e = Enemie((x, y))
                 e.add(ENEMIES_GROUP, ALL_SPRITES)
             self.spawed = True
-
+            for d in self.doors:
+                d.lock()
+            self.figthing = True
             print("Enemies in this room %s" % enemies)
+
+    def update(self):
+        if self.figthing:
+            if len(ENEMIES_GROUP) == 0:
+                for d in self.doors:
+                    d.unlock()
+                    self.figthing = False
 
 
 class Dugeon(object):
@@ -204,14 +231,10 @@ class Dugeon(object):
 
         self.initial_room = random.choice(self.rooms)
         self.initial_room.spawed = True
-        r = self.initial_room
-        while(r == self.initial_room):
-            r = random.choice(self.rooms)
-        self.final_room = r
 
         self.walls = []
         self.make_walls()
-        self.remove_useless_doors()
+        # self.remove_useless_doors()
         self.fix_walls()
 
         self.player = Player(self.initial_room.rect.center, ALL_SPRITES)
@@ -239,14 +262,14 @@ class Dugeon(object):
                 a = cells[i]
                 for j in range(i+1, len(cells)):
                     b = cells[j]
-                    if a.rect.colliderect(b.rect.inflate(TS2, TS2)):
+                    if a.rect.colliderect(b.rect.inflate(TS4, TS4)):
                         touching = True
                         dx = min(
-                            a.rect.right-b.rect.left+TS2,
-                            a.rect.left-b.rect.right-TS2)
+                            a.rect.right-b.rect.left+TS4,
+                            a.rect.left-b.rect.right-TS4)
                         dy = min(
-                            a.rect.bottom-b.rect.top+TS2,
-                            a.rect.top-b.rect.bottom-TS2)
+                            a.rect.bottom-b.rect.top+TS4,
+                            a.rect.top-b.rect.bottom-TS4)
                         if (abs(dx) < abs(dy)):
                             dy = 0
                         else:
@@ -258,13 +281,13 @@ class Dugeon(object):
                         dyb = dy + dya
 
                         dxa = math.floor(
-                            ((dxa + TS2 - 1)/TS2))*TS2
+                            ((dxa + TS4 - 1)/TS4))*TS4
                         dxb = math.floor(
-                            ((dxb + TS2 - 1)/TS2))*TS2
+                            ((dxb + TS4 - 1)/TS4))*TS4
                         dya = math.floor(
-                            ((dya + TS2 - 1)/TS2))*TS2
+                            ((dya + TS4 - 1)/TS4))*TS4
                         dyb = math.floor(
-                            ((dyb + TS2 - 1)/TS2))*TS2
+                            ((dyb + TS4 - 1)/TS4))*TS4
 
                         a.pos[0] += dxa
                         a.pos[1] += dya
@@ -393,10 +416,8 @@ class Dugeon(object):
                                 ALL_SPRITES.change_layer(door, 6)
                                 self.doors.append(door)
                                 door.room = room
+                                room.doors.append(door)
                                 old_hall = hall
-                                if room == self.final_room:
-                                    door.locked = True
-                                    door.image = door.locked_image
                         else:
                             self.walls.append(wall)
                             ALL_SPRITES.add(wall)
@@ -467,6 +488,7 @@ class Dugeon(object):
         self.cursor.update(self.viewport)
         # BULLETS_GROUP.update(dt)
         ENEMIES_GROUP.update(dt, self.player)
+        self.rooms_group.update()
 
         visible_sprites = pg.sprite.spritecollide(
             self.viewport, ALL_SPRITES, False)
@@ -486,9 +508,9 @@ class Dugeon(object):
         # ALL_SPRITES.repaint_rect(self.viewport)
         self.image.blit(self.bg_image, (self.viewport.rect))
         self.visible_sprites.draw(self.image)
-        # self.player.render(self.image)
         BULLETS_GROUP.draw(self.image)
         ENEMIES_GROUP.draw(self.image)
+        DECORATOR_GROUP.draw(self.image)
         surface.blit(self.image, (0, 0), self.viewport)
         self.viewport.render(surface)
 

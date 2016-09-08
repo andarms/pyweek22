@@ -1,10 +1,12 @@
 import math
 from itertools import cycle
+from threading import Timer
 
 import pygame as pg
 from bulletml import Bullet, BulletML
 
 from conts import *
+from weapons import SimpleWeapon, SimpleBullet
 
 
 def wall_collide(left, right):
@@ -28,13 +30,6 @@ class Player(pg.sprite.DirtySprite):
         self.old_direction = self.face_direction
         self.speed = 300
 
-        # Armo
-        self.pattern = BulletML.FromDocument(open("threefire.xml", "rU"))
-        self.bullets = []
-        self.cooldowntime = 0.3
-        self.cooldown = self.cooldowntime
-        self.cooled = False
-
         frames = self.get_frames("hero")
         self.idelframes = {}
         self.frames = self.make_frame_dict(frames)
@@ -46,6 +41,9 @@ class Player(pg.sprite.DirtySprite):
         self.rect = self.image.get_rect(topleft=self.pos)
         self.hit_rect = pg.Rect(0, 0, 10, 10)
         self.hit_rect.center = self.rect.center
+
+        # Armo
+        self.weapon = SimpleWeapon(self.rect.topleft)
 
     def make_frame_dict(self, frames):
         frame_dict = {}
@@ -100,9 +98,20 @@ class Player(pg.sprite.DirtySprite):
         else:
             self.collide = False
         door = pg.sprite.spritecollideany(self, doors, wall_collide)
-        if(door):
-            door.room.spaw_enemies()
+        if door and door.locked:
+            if self.direction == "LEFT":
+                self.hit_rect.left = door.rect.right
+            elif self.direction == "RIGHT":
+                self.hit_rect.right = door.rect.left
+            elif self.direction == "UP":
+                self.hit_rect.top = door.rect.bottom
+            elif self.direction == "DOWN":
+                self.hit_rect.bottom = door.rect.top
+            self.rect.center = self.hit_rect.center
+        elif door and not door.opened:
             door.open()
+            timer = Timer(1, door.room.spaw_enemies)
+            timer.start()
 
     def change_face_direction(self, angle):
         # to not convert  to degrees
@@ -110,14 +119,6 @@ class Player(pg.sprite.DirtySprite):
             self.face_direction = "LEFT"
         else:
             self.face_direction = "RIGHT"
-
-    def shoot(self):
-        if self.cooled:
-            bullet = SimpleBullet.FromDocument(
-                self.pattern, self.x, self.y, target=self.cursor)
-            self.bullets.extend([bullet])
-            bullet.vanished = True
-            bullet.kill()
 
     def animate(self, now=0):
         now = pg.time.get_ticks()
@@ -140,7 +141,7 @@ class Player(pg.sprite.DirtySprite):
 
         if event.type == pg.MOUSEBUTTONUP:
             if event.button == 1:
-                self.shoot()
+                self.weapon.shoot(self.cursor)
 
         if event.type == pg.KEYUP:
             if event.key in CONTROLS:
@@ -156,28 +157,17 @@ class Player(pg.sprite.DirtySprite):
         self.check_collitions(walls, doors)
         self.x, self.y = self.hit_rect.center
 
-        # Bullets
-        if(self.bullets):
-            for bullet in self.bullets:
-                self.bullets.extend(bullet.step())
-                bullet.update(dt)
-        self.cooldown -= dt
-        if self.cooldown < 0:
-            self.cooled = True
-
         # Direction
         x = self.cursor.rect.left - self.rect.left
         y = self.cursor.rect.top - self.rect.top
         self.angle = math.atan2(y, x)
         self.change_face_direction(self.angle)
+        self.weapon.update(dt, self.rect.topleft, self.face_direction)
 
         self.animate()
 
-    def render(self, surface):
+    def draw(self, surface):
         surface.blit(self.image, self.rect)
-        for b in self.bullets:
-            if not b.vanished:
-                surface.blit(b.image, (b.x, b.y))
 
 
 class Enemie(pg.sprite.DirtySprite):
@@ -228,40 +218,3 @@ class Enemie(pg.sprite.DirtySprite):
             for bullet in self.bullets:
                 self.bullets.extend(bullet.step())
                 bullet.update(dt)
-
-
-class SimpleBullet(Bullet, pg.sprite.DirtySprite):
-
-    """docstring for Bullet"""
-
-    def __init__(self, x=0, y=0, direction=0, speed=0, target=None,
-                 actions=(), rank=0.5, tags=(), appearance=None,
-                 radius=0.5):
-        self.radius = 2
-        self.speed = speed
-        Bullet.__init__(self, x, y, direction, self.speed, target,
-                        actions, rank, tags, appearance,
-                        self.radius)
-        pg.sprite.DirtySprite.__init__(self, BULLETS_GROUP)
-
-        self.color = (255, 255, 0)
-        w, h = (20, 20)
-        self.image = pg.Surface((w, h))
-        self.image.fill(self.color)
-        self.rect = self.image.get_rect()
-        self.rect.topleft = self.x, self.y
-        self.time = 0.0
-        self.lifetime = 5
-        # self.speed = 450
-        # self.dx = math.cos(angle) * self.speed
-        # self.dy = math.sin(angle) * self.speed
-        # self.dirty = 2
-        self.layer = 9
-
-    def update(self, dt):
-        self.time += dt
-        self.rect.topleft = self.x, self.y
-        if self.time > self.lifetime:
-            self.kill()
-            self.vanished = True
-            del(self)
