@@ -26,7 +26,7 @@ class Player(pg.sprite.DirtySprite):
         self.direction_stack = []
         self.face_direction = "RIGHT"
         self.old_direction = self.face_direction
-        self.speed = 200
+        self.speed = 300
 
         # Armo
         self.pattern = BulletML.FromDocument(open("threefire.xml", "rU"))
@@ -117,6 +117,7 @@ class Player(pg.sprite.DirtySprite):
                 self.pattern, self.x, self.y, target=self.cursor)
             self.bullets.extend([bullet])
             bullet.vanished = True
+            bullet.kill()
 
     def animate(self, now=0):
         now = pg.time.get_ticks()
@@ -185,40 +186,51 @@ class Enemie(pg.sprite.DirtySprite):
 
     def __init__(self, pos):
         super(Enemie, self).__init__()
-        self.x, y = pos
-        self.cooldowntime = 0.3
+        self.x, self.y = pos
+        self.cooldowntime = 0.7
         self.cooldown = self.cooldowntime
-        self.cooled = False
+        self.cooled = True
         self.image = pg.Surface((TILE_SIZE, TILE_SIZE))
         self.image.fill((255, 0, 255))
         self.image.convert()
         self.rect = self.image.get_rect(topleft=pos)
         self.hit_rect = self.rect.copy()
         self.hit_rect.center = self.rect.center
+        self.pattern = BulletML.FromDocument(open("threefire.xml", "rU"))
+        self.bullets = []
+        self.lifetime = 10
 
     def update(self, dt, player):
-        if cooled:
+        self.lifetime -= dt
+        if self.lifetime < 0:
+            for b in self.bullets:
+                b.vanished = True
+                b.kill()
+                del(b)
+            self.kill()
+            del(self)
+            return
+
+        if self.cooled:
             bullet = SimpleBullet.FromDocument(
                 self.pattern, self.x, self.y, target=player)
             self.bullets.extend([bullet])
             bullet.vanished = True
+            bullet.kill()
+            self.cooled = False
 
         self.cooldown -= dt
         if self.cooldown < 0:
             self.cooled = True
+            self.cooldown = self.cooldowntime
 
         if(self.bullets):
             for bullet in self.bullets:
                 self.bullets.extend(bullet.step())
-
-    def render(self, surface):
-        surface.blit(self.image, self.rect)
-        for b in self.bullets:
-            if not b.vanished:
-                surface.blit(b.image, (b.x, b.y))
+                bullet.update(dt)
 
 
-class SimpleBullet(Bullet):
+class SimpleBullet(Bullet, pg.sprite.DirtySprite):
 
     """docstring for Bullet"""
 
@@ -227,15 +239,17 @@ class SimpleBullet(Bullet):
                  radius=0.5):
         self.radius = 2
         self.speed = speed
-        super(SimpleBullet, self).__init__(x, y, direction, self.speed, target,
-                                           actions, rank, tags, appearance,
-                                           self.radius)
+        Bullet.__init__(self, x, y, direction, self.speed, target,
+                        actions, rank, tags, appearance,
+                        self.radius)
+        pg.sprite.DirtySprite.__init__(self, BULLETS_GROUP)
 
         self.color = (255, 255, 0)
         w, h = (20, 20)
         self.image = pg.Surface((w, h))
         self.image.fill(self.color)
-        self.image.convert()
+        self.rect = self.image.get_rect()
+        self.rect.topleft = self.x, self.y
         self.time = 0.0
         self.lifetime = 5
         # self.speed = 450
@@ -246,6 +260,8 @@ class SimpleBullet(Bullet):
 
     def update(self, dt):
         self.time += dt
+        self.rect.topleft = self.x, self.y
         if self.time > self.lifetime:
-            # self.kill()
+            self.kill()
             self.vanished = True
+            del(self)
