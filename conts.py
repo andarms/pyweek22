@@ -88,6 +88,8 @@ pg.init()
 SCREEN = pg.display.set_mode(SCREEN_SIZE)
 SCREEN_RECT = SCREEN.get_rect()
 BULLETS_GROUP = pg.sprite.Group()
+ENEMIES_GROUP = pg.sprite.LayeredDirty()
+ALL_SPRITES = pg.sprite.LayeredDirty()
 
 
 os.environ['SDL_VIDEO_CENTERED'] = '1'

@@ -44,7 +44,7 @@ class Player(pg.sprite.DirtySprite):
 
         self.image = frames[0][0]
         self.rect = self.image.get_rect(topleft=self.pos)
-        self.hit_rect = pg.Rect(0, 0, TILE_SIZE, TILE_SIZE)
+        self.hit_rect = pg.Rect(0, 0, 10, 10)
         self.hit_rect.center = self.rect.center
 
     def make_frame_dict(self, frames):
@@ -179,7 +179,7 @@ class Player(pg.sprite.DirtySprite):
                 surface.blit(b.image, (b.x, b.y))
 
 
-class Enemie(pg.sprite.Sprite):
+class Enemie(pg.sprite.DirtySprite):
 
     """docstring for Enemie"""
 
